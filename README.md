@@ -208,4 +208,116 @@ Client mendapatkan DNS dari WISE dan client dapat terhubung dengan internet mela
 
 ### Penyelesaian
 #### WISE
-1. 
+1. Ubah konfigurasi yang terletak pada `/etc/bind/named.conf.options` sebagai berikut
+    ```
+    options {
+        directory "/var/cache/bind";
+
+        // If there is a firewall between you and nameservers you want
+        // to talk to, you may need to fix the firewall to allow multiple
+        // ports to talk.  See http://www.kb.cert.org/vuls/id/800113
+
+        // If your ISP provided one or more IP addresses for stable
+        // nameservers, you probably want to use them as forwarders.
+        // Uncomment the following block, and insert the addresses replacing
+        // the all-0's placeholder.
+
+         forwarders {
+                192.168.122.1;
+         };
+
+        //=======================================================================
+==
+        // If BIND logs error messages about the root key being expired,
+        // you will need to update your keys.  See https://www.isc.org/bind-keys
+        //=======================================================================
+==
+        //dnssec-validation auto;
+        allow-query{any;};
+
+        auth-nxdomain no;    # conform to RFC1035
+        listen-on-v6 { any; };
+    };
+    ```
+
+2. Jangan lupa untuk restart DNS Server menggunakan command `service bind9 restart`
+
+#### Westalis
+3. Tambahkan konfigurasi `option domain-name-servers 192.213.2.2;` pada `/etc/dhcp/dhcpd.conf` menggunakan IP dari **WISE**
+
+4. Restart DHCP Server menggunakan command `service isc-dhcp-server restart`
+
+## Soal 6
+Lama waktu DHCP server meminjamkan alamat IP kepada Client yang melalui Switch1 selama 5 menit sedangkan pada client yang melalui Switch3 selama 10 menit. Dengan waktu maksimal yang dialokasikan untuk peminjaman alamat IP selama 115 menit
+
+### Penyelesaian
+#### Westalis
+1. Untuk switch1 karena alamat ip akan dipinjamkan selama 5 menit dan maksimal alokasi adalah 115 menit, maka akan ditambahkan konfigurasi `default-lease-time 300` dan `max-lease-time 6900` sebagai berikut
+    ```
+    subnet 192.213.1.0 netmask 255.255.255.0 {
+        range 192.213.1.50 192.213.1.88;
+        range 192.213.1.120 192.213.1.155;
+        option routers 192.213.1.1;
+        option broadcast-address 192.213.1.255;
+        option domain-name-servers 192.213.2.2;
+        default-lease-time 300;
+        max-lease-time 6900;
+    }
+    ```
+
+2. Untuk switch3 karena alamat ip akan dipinjamkan selama 10 menit dan maksimal alokasi adalah 115 menit, maka akan ditambahkan konfigurasi `default-lease-time 600` dan `max-lease-time 6900` sebagai berikut
+    ```
+    subnet 192.213.3.0 netmask 255.255.255.0 {
+        range 192.213.3.10 192.213.3.30;
+        range 192.213.3.60 192.213.3.85;
+        option routers 192.213.3.1;
+        option broadcast-address 192.213.3.255;
+        option domain-name-servers 192.213.2.2;
+        default-lease-time 600;
+        max-lease-time 6900;
+    }
+    ```
+
+3. Restart DHCP Server menggunakan command `service isc-dhcp-server restart`
+
+### Testing
+- Switch 1 (SSS dan Garden)
+    ![](img/soal_6/sss.png)
+    ![](img/soal_6/garden.png)
+
+- Switch 3 (Eden, Newston, Kemono)
+    ![](img/soal_6/eden.png)
+    ![](img/soal_6/newston.png)
+    ![](img/soal_6/kemono.png)
+
+## Soal 7
+Loid dan Franky berencana menjadikan Eden sebagai server untuk pertukaran informasi dengan alamat IP yang tetap dengan IP [prefix IP].3.13
+
+### Penyelesaian 
+#### Eden
+1. Periksa hwaddress dari eden menggunakan `ifconfig` kemudian copy dan paste hwaddress pada `/etc/network/interfaces` menjadi sebagai berikut
+    ```
+    auto eth0
+    iface eth0 inet dhcp
+    hwaddress ether 76:2d:07:66:85:2b
+    ```
+2. Restart node eden
+
+#### Westalis
+3. Tambahkan konfigurasi dhcp pada `/etc/dhcp/dhcpd.conf` sehingga eden bisa mendapatkan fixed address sebagai berikut
+    ```
+    host Eden {
+        hardware ethernet 76:2d:07:66:85:2b;
+        fixed-address 192.213.3.13;
+    }
+    ```
+
+4. Restart DHCP Server menggunakan command `service isc-dhcp-server restart`
+
+### Testing
+![](img/soal_4/eden.png)
+
+## Soal 8
+Client hanya dapat mengakses internet diluar (selain) hari & jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)
+
+### Penyelesaian
