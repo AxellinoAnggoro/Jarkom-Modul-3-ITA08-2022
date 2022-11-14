@@ -226,12 +226,10 @@ Client mendapatkan DNS dari WISE dan client dapat terhubung dengan internet mela
                 192.168.122.1;
          };
 
-        //=======================================================================
-==
+        //===================================================================
         // If BIND logs error messages about the root key being expired,
         // you will need to update your keys.  See https://www.isc.org/bind-keys
-        //=======================================================================
-==
+        //===================================================================
         //dnssec-validation auto;
         allow-query{any;};
 
@@ -321,3 +319,167 @@ Loid dan Franky berencana menjadikan Eden sebagai server untuk pertukaran inform
 Client hanya dapat mengakses internet diluar (selain) hari & jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)
 
 ### Penyelesaian
+Buat file baru bernama acl.conf di folder squid ```nano /etc/squid/acl.conf```
+<br>
+Lalu tambahkan 2 baris berikut 
+```
+    acl WORK_HOUR time MTWHF 08:00-16:59
+    acl WEEK_END time SA 00:00-23:59
+```
+Lalu pada ```squid.conf``` tambahkan baris berikut 
+```
+http_access allow WORK_HOUR_SITES WORK_HOUR
+http_access allow !WORK_HOUR
+http_access deny all
+```
+Dan konfigurasi telah selesai
+
+![](img/soal8_a.png)
+![](img/soal8_b.png)
+
+## Soal 9
+Adapun pada hari dan jam kerja sesuai nomor (1), client hanya dapat mengakses domain loid-work.com dan franky-work.com (IP tujuan domain dibebaskan)
+
+### Penyelesaian
+### Wise
+Masukkan konfigurasi berikut untuk mengatur nama website pada Wise sebagai DNS Server yakni pada ```/etc/bind/named.conf.local```
+
+```
+zone \"loid-work.com\" {
+        type master;
+        file \"/etc/bind/wise/loid-work.com\";
+};
+zone \"franky-work.com\" {
+        type master;
+        file \"/etc/bind/wise/franky-work.com\";
+};
+```
+
+Lalu jangan lupa juga konfigurasi pada file masing-masing website, untuk loid pada ```/etc/bind/wise/loid-work.com```
+```
+;
+; BIND data file for local loopback interface
+;
+\$TTL    604800
+@       IN      SOA     loid-work.com. root.loid-work.com. (
+                        2022102501      ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@               IN      NS      loid-work.com.
+@               IN      A       192.213.2.2 ;IP Wise
+```
+
+Untuk franky pada ```/etc/bind/wise/franky-work.com```
+```
+;
+; BIND data file for local loopback interface
+;
+\$TTL    604800
+@       IN      SOA     franky-work.com. root.franky-work.com. (
+                        2022102501      ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@               IN      NS      franky-work.com.
+@               IN      A       192.213.2.2 ;IP Wise
+```
+
+Lalu jangan lupa kita setting Apache nya seperti berikut
+<br>
+Untuk loid pada ```/etc/apache2/sites-available/loid-work.com.conf```
+
+```
+<VirtualHost *:80>
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+        ServerName loid-work.com
+ 
+        ErrorLog \${APACHE_LOG_DIR}/error.log
+        CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+```
+Untuk franky pada ```/etc/apache2/sites-available/franky-work.com.conf```
+```
+<VirtualHost *:80>
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+        ServerName franky-work.com
+ 
+        ErrorLog \${APACHE_LOG_DIR}/error.log
+        CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+```
+### Berlint
+Lakukan konfigurasi pada ```/etc/squid/working-hour-sites.acl``` masukkan baris seperti berikut
+```
+loid-work.com
+franky-work.com
+```
+Dan tambahkan juga baris pada ``` /etc/squid/squid.conf ```
+```
+acl WORK_HOUR_SITES dstdomain \"/etc/squid/working-hour-sites.acl\"
+```
+Maka jika kita testing akan muncul seperti berikut :
+
+![](img/soal9_a.png) <br>
+Untuk ```loid-work.com```
+![](img/soal9_b.png)
+Untuk ```root.franky-work.com```
+![](img/soal9_c.png)
+
+## Soal 10
+Saat akses internet dibuka, client dilarang untuk mengakses web tanpa HTTPS. (Contoh web HTTP: http://example.com)
+
+### Penyelesaian
+### Berlint
+Buat file konfigurasi pada ```/etc/squid/acl-port.conf``` yang berisi
+```
+acl HTTPS_PORT port 443
+acl CONNECT method CONNECT
+```
+Lalu tambahkan konfigurasi pada ```squid.conf```
+```
+include /etc/squid/acl-port.conf
+
+http_access deny !HTTPS_PORT
+http_access deny CONNECT !HTTPS_PORT
+```
+<br>
+Hasil Testing pada contoh web HTTP http://example.com
+
+![](img/soal10_a.png)
+![](img/soal10_b.png)
+
+## Soal 11
+Agar menghemat penggunaan, akses internet dibatasi dengan kecepatan maksimum 128 Kbps pada setiap host (Kbps = kilobit per second; lakukan pengecekan pada tiap host, ketika 2 host akses internet pada saat bersamaan, keduanya mendapatkan speed maksimal yaitu 128 Kbps)
+### Penyelesaian
+### Berlint
+
+Buat script konfigurasi yang diletakkan pada ```/etc/squid/acl-bandwidth.conf ``` yang berisi seperti berikut :
+```
+delay_pools 1
+delay_class 1 1
+delay_access 1 allow WEEK_END
+delay_parameters 1 16000/16000
+```
+Lalu tambahkan satu baris pada file konfigurasi ``` /etc/squid/squid.conf```
+```
+include /etc/squid/acl-bandwidth.conf
+```
+Lalu jangan lupa restart squid
+
+### Testing
+Pastikan speed cli telah terdownload pada node kalian
+
+![](img/soal11_a.jpg)
+![](img/soal11_b.jpg)
+
+## Soal 12
+Setelah diterapkan, ternyata peraturan nomor (4) mengganggu produktifitas saat hari kerja, dengan demikian pembatasan kecepatan hanya diberlakukan untuk pengaksesan internet pada hari libur
+
+
