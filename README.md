@@ -428,7 +428,7 @@ Maka jika kita testing akan muncul seperti berikut :
 
 ![](img/soal9_a.png) <br>
 Untuk ```loid-work.com```
-![](img/soal9_b.png)
+![](img/soal9_b.png) <br>
 Untuk ```root.franky-work.com```
 ![](img/soal9_c.png)
 
