@@ -319,7 +319,7 @@ Loid dan Franky berencana menjadikan Eden sebagai server untuk pertukaran inform
 Client hanya dapat mengakses internet diluar (selain) hari & jam kerja (senin-jumat 08.00 - 17.00) dan hari libur (dapat mengakses 24 jam penuh)
 
 ### Penyelesaian
-Buat file baru bernama acl.conf di folder squid ```nano /etc/squid/acl.conf```
+Buat file baru bernama acl-time.conf di folder squid ```/etc/squid/acl-time.conf```
 <br>
 Lalu tambahkan 2 baris berikut 
 ```
@@ -328,14 +328,24 @@ Lalu tambahkan 2 baris berikut
 ```
 Lalu pada ```squid.conf``` tambahkan baris berikut 
 ```
-http_access allow WORK_HOUR_SITES WORK_HOUR
+include /etc/squid/acl-time.conf
+
+http_port 8080
+dns_nameservers 192.213.2.2
+ 
+acl WORK_HOUR_SITES dstdomain \"/etc/squid/working-hour-sites.acl\"
+ 
 http_access allow !WORK_HOUR
 http_access deny all
+ 
+visible_hostname Berlint
 ```
-Dan konfigurasi telah selesai
+- `http_access allow !WORK_HOUR` digunakan agar proxy hanya memperbolehkan akses internet selain jam kerja
+- `http_port` digunakan untuk menginisialisasi port yang akan digunakan saat mengakses proxy
+- `visible_hostname` digunakan untuk menampilkan server proxy yang digunakan ketika muncul pesan error
 
-![](img/soal8_a.png)
-![](img/soal8_b.png)
+Hasil Testing:
+![](img/soal10_b.png)
 
 ## Soal 9
 Adapun pada hari dan jam kerja sesuai nomor (1), client hanya dapat mengakses domain loid-work.com dan franky-work.com (IP tujuan domain dibebaskan)
@@ -415,21 +425,26 @@ Untuk franky pada ```/etc/apache2/sites-available/franky-work.com.conf```
 </VirtualHost>
 ```
 ### Berlint
-Lakukan konfigurasi pada ```/etc/squid/working-hour-sites.acl``` masukkan baris seperti berikut
+Lakukan konfigurasi pada ```/etc/squid/working-hour-sites.acl``` masukkan baris seperti berikut untuk memasukkan whitelist domain yang bisa diakses saat jam kerja
 ```
 loid-work.com
 franky-work.com
 ```
-Dan tambahkan juga baris pada ``` /etc/squid/squid.conf ```
+
+Tambahkan juga konfigurasi berikut pada ``` /etc/squid/squid.conf ```
 ```
 acl WORK_HOUR_SITES dstdomain \"/etc/squid/working-hour-sites.acl\"
+http_access allow WORK_HOUR_SITES WORK_HOUR
 ```
-Maka jika kita testing akan muncul seperti berikut :
 
-![](img/soal9_a.png) <br>
-Untuk ```loid-work.com```
+
+Maka jika kita testing akan muncul seperti berikut :
+![](img/soal9_a.png)
+
+- Untuk ```loid-work.com```
 ![](img/soal9_b.png) <br>
-Untuk ```root.franky-work.com```
+
+- Untuk ```franky-work.com```
 ![](img/soal9_c.png)
 
 ## Soal 10
@@ -451,8 +466,10 @@ http_access deny CONNECT !HTTPS_PORT
 ```
 <br>
 Hasil Testing pada contoh web HTTP http://example.com
-
+- Sebelum client disambungkan proxy
 ![](img/soal10_a.png)
+
+- Setelah client disambungkan proxy
 ![](img/soal10_b.png)
 
 ## Soal 11
@@ -464,7 +481,7 @@ Buat script konfigurasi yang diletakkan pada ```/etc/squid/acl-bandwidth.conf ``
 ```
 delay_pools 1
 delay_class 1 1
-delay_access 1 allow WEEK_END
+delay_access 1 allow all
 delay_parameters 1 16000/16000
 ```
 Lalu tambahkan satu baris pada file konfigurasi ``` /etc/squid/squid.conf```
@@ -477,9 +494,28 @@ Lalu jangan lupa restart squid
 Pastikan speed cli telah terdownload pada node kalian
 
 ![](img/soal11_a.jpg)
-![](img/soal11_b.jpg)
 
 ## Soal 12
 Setelah diterapkan, ternyata peraturan nomor (4) mengganggu produktifitas saat hari kerja, dengan demikian pembatasan kecepatan hanya diberlakukan untuk pengaksesan internet pada hari libur
 
+### Penyelesaian
+### Berlint
+Tambahkan konfigurasi `allow WEEK_END` pada file konfigurasi `/etc/squid/acl-bandwidth.conf` sebagai berikut:
+```
+delay_pools 1
+delay_class 1 1
+delay_access 1 allow WEEK_END
+delay_parameters 1 16000/16000
+```
 
+Dimana `WEEK_END` merupakan konfigurasi acl yang mengatur waktu di luar hari kerja pada `include /etc/squid/acl-time.conf` berikut:
+```
+acl WORK_HOUR time MTWHF 08:00-16:59
+acl WEEK_END time SA 00:00-23:59
+```
+
+### Testing
+![](img/soal_12.jpg)
+
+## Kendala Pengerjaan
+-
